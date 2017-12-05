@@ -5,6 +5,8 @@ This code is provided as-is. I am more than happy for anyone to take it and use 
 
 ## Example
 ```c++
+  AsyncHTTPClient httpClient;
+  
   void readSucceeded() {
 	  String body = httpClient.getBody();
     ...
