@@ -1,5 +1,7 @@
 #include <ESPAsyncHTTPClient.h>
 
+#define DEBUG(...) { Serial.println(__VA_ARGS__); }
+
 String& ByteString::copy(const void *data, unsigned int length) {
 	if (!reserve(length)) {
 		invalidate();
@@ -20,6 +22,11 @@ void AsyncHTTPClient::initialize(String url) {
 
 	protocol = url.substring(0, index);
 	DEBUG(protocol);
+	port = 80;	//Default
+	if (index == 5) {
+		port = 443;
+	}
+
 	url.remove(0, (index + 3)); // remove http:// or https://
 
 	index = url.indexOf('/');
@@ -38,7 +45,6 @@ void AsyncHTTPClient::initialize(String url) {
 	}
 
 	// get port
-	port = 80;	//Default
 	index = hostPart.indexOf(':');
 	if (index >= 0) {
 		host = hostPart.substring(0, index); // hostname
@@ -51,9 +57,11 @@ void AsyncHTTPClient::initialize(String url) {
 		DEBUG(host);
 	}
 	uri = url;
-	if (protocol != "http") {
-		initialized = false;
-	}
+#if	ASYNC_TCP_SSL_ENABLED
+	initialized = protocol == "http" || protocol == "https";
+#else
+	initialized = protocol == "http";
+#endif
 
 	DEBUG(initialized);
 	request = "GET " + uri + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n";
@@ -147,8 +155,18 @@ void AsyncHTTPClient::makeRequest(void (*success)(), void (*fail)(String msg)) {
 	aClient->onError(clientError, this);
 
 	aClient->onConnect(clientConnect, this);
-
-	if (!aClient->connect(host.c_str(), port)) {
+	bool connected = false;
+#if	ASYNC_TCP_SSL_ENABLED
+	if (protocol == "https") {
+		DEBUG("Creating secure connection");
+		connected = aClient->connect(host.c_str(), port, true);
+	} else {
+		connected = aClient->connect(host.c_str(), port, false);
+	}
+#else
+	connected = aClient->connect(host.c_str(), port);
+#endif
+	if (!connected) {
 		DEBUG("Connect Fail");
 		fail("Connection failed");
 		AsyncClient * client = aClient;
